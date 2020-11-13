@@ -1,10 +1,22 @@
-
+/* ******************************************************
+Nom ......... : serveur.c
+Role ........ : serveur d'échanges de scores
+Auteur ...... : Jean Méhat (mais largement revisité par
+                Nicolas Tercé)
+Version ..... : V1 .1 du 13/11/2020
+Licence ..... : réalisé dans le cadre du cours de SE (IED L2)
+Compilation :
+gcc -Wall serveur.c -o serveur
+Pour exécuter , tapez : ./serveur
+******************************************************* */
 # include "sys.h"
 # define LONGline 100
+//nombre de meilleurs scores à afficher:
+# define max_liste 5
 
 # define DEBUG if (0) fprintf
 
-/////////////fonction de fabrication de liste de score inspirée du cours de Algo1:
+////fonction de fabrication de liste de score inspirée du cours de Algo1:
 list cons_score(char * nom , int score , list liste)
 {
   list triplet = malloc (sizeof (list));
@@ -15,13 +27,15 @@ list cons_score(char * nom , int score , list liste)
   return triplet;
 }
 
+////algorithme de tri de liste avec double while imbriqué
+////(trouvé sur internet)
 int algo_tri(list liste)
 {
-  //je vais avoir besoin d'une "case" liste temporaire:
+  ////je vais avoir besoin d'une "case" liste temporaire:
   list tmp=malloc (sizeof (list));
   if (!tmp) printf("pas assez de  RAM ...\n");
 
-  // et de deux autres cases pour le tri:
+  ////et de deux autres cases pour le tri:
   list current =  liste;
   list index = cdr(liste);
 
@@ -31,14 +45,18 @@ int algo_tri(list liste)
     while(current)
     {
       index = cdr(current);
+
       DEBUG (stderr,"current score :%i\tcurrent nom: %s\n",score(current),nom(current));
       while( index)
       {
-        if (score(current)> score(index))
+        if (score(current)< score(index))
         {
+          ////l'algo intervertit l'élément "current" et "index" si current<index
           score(tmp)=score(current);
           nom(tmp)=nom(current);
+
           DEBUG (stderr,"tmp score :%i\ttmp nom: %s\n",score(tmp),nom(tmp));
+
           score(current)=score(index);
           nom(current)= nom(index);
 
@@ -58,32 +76,8 @@ int algo_tri(list liste)
   return 0;
 }
 
-/*
-if(self.head == None):
-return;
-else:
-while(current != None):
-#Node index will point to node next to current
-index = current.next;
-
-while(index != None):
-#If current node's data is greater than index's node data, swap the data between them
-if(current.data > index.data):
-temp = current.data;
-current.data = index.data;
-index.data = temp;
-index = index.next;
-current = current.next;*/
-
-
-
-
-
-
-
-
-
-
+////serveur très largement inspiré de celui du chapitre 8 du cours de Jean Méhat:
+////"Le problème de Collatz"
 int
 servir(int fd){
   FILE * stream;
@@ -105,19 +99,26 @@ servir(int fd){
     exit(1);
   }
   setbuf(stream, 0);
+////ici j'ai supprimé le while de la version "Collatz",
+////le for ne tourne que 2 fois:
+////pour recevoir le "SET" de premier échange
+////et le deuxième ordre (ASK ou ADD)
+for(int i=0;i<2;i++)
+{
 
-  while(fgets(buffer, sizeof buffer, stream) != 0)
+  if(fgets(buffer, sizeof buffer, stream) !=0)
   {
+    DEBUG(stdout,"le buffer reçu contient:%s\n",buffer);
     if (strncmp(buffer, "SET", 3) == 0)
     {
       DEBUG(stdout,"SET bien reçu\n");
-      fprintf(stream, "200 ");
+      fprintf(stream, "200 \n");
     }
     ////si sscanf qui recoit ADD renvoit bien deux valeurs:
-    if (sscanf(buffer, "ADD %s %d",nom, &t) == 2 )
+    else if (sscanf(buffer, "ADD %s %d",nom, &t) == 2 )
     {
 
-      fprintf(stream, "200 reçu ADD %s %d\n",nom, t);
+      fprintf(stream, "250 reçu ADD %s %d\n",nom, t);
       /////ouverture du fichier de scores en ecriture
       lecture_score = fopen("scores" ,"a");
       fprintf(lecture_score,"%s %d\n",nom,t);
@@ -126,37 +127,39 @@ servir(int fd){
     }
     else if (strncmp(buffer, "ASK", 3) == 0)
     {
+      DEBUG(stdout,"reçu ASK ici...\n");
 
-      fprintf(stream, "200 reçu ASK\n");
-      /////////ouvrir le fichier score en lecture
+      fprintf(stream, "250 reçu ASK\n");
+
+      ////ouvrir le fichier score en lecture
       lecture_score = fopen("scores" ,"r");
-      /////////tant qu'il y a des lignes à lire:
+      ////tant qu'il y a des lignes à lire:
       while (fgets(ligne,LONGline,lecture_score) != NULL || !feof(lecture_score))
       {
-        //fabrication d'un "maillon" de la chaine
+        ////fabrication d'un "maillon" de la chaine
         sscanf (ligne,"%s %i",chaine_scan,&score_scan);
         chaine_dup= strdup(chaine_scan);
         printf("%s", chaine_dup);
         liste_pointeur =cons_score(chaine_dup,score_scan,liste_pointeur);
 
       }
-      //sauvegarde du pointeur du début de la liste:
+      ////sauvegarde du pointeur du début de la liste:
       list liste_debut= liste_pointeur;
 
-      //tri:
+      ////tri:
       algo_tri(liste_debut);
 
-      //impression de la liste
-      while (liste_pointeur)
+      ////impression de la liste
+      for (int a=0;liste_pointeur!= NULL&& a<max_liste;a++)
       {
-        /////////envoyer les lignes de la liste sur le stream
+        ////envoyer les lignes de la liste sur le stream
         DEBUG(stderr,"nom:%s,%p\tscore:%i,%p\n",nom(liste_pointeur),nom(liste_pointeur),score(liste_pointeur),&score(liste_pointeur));
         fprintf(stream,"nom:%s\tscore:%i\n",nom(liste_pointeur),score(liste_pointeur));
         liste_pointeur=cdr(liste_pointeur);
       }
 
 
-      fprintf(stream, "200 transmission scores terminée\n");
+      fprintf(stream, "250 transmission scores terminée\n");
 
       fclose(lecture_score);
     }
@@ -165,17 +168,22 @@ servir(int fd){
       fprintf(stream, "200 bye\n");
       exit(0);
     }
-    else
+    else{
+      DEBUG(stderr,"le buffer ici contient:%s",buffer);
     fprintf(stream, "500 message incorrect\n");
   }
-  exit(0);
+}
+  else (printf("erreur fgets.\n"));
+}
+  printf("connexion terminée \n");
+  return 0;
 }
 
 int
 main(int ac, char * av[]){
   char * p;
 
-  p = answerone("19986", servir);
+  p = answersync("19986", servir);
   fprintf(stderr, "repondre a echoue: %s\n", p);
   return 1;
 }

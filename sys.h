@@ -24,4 +24,4 @@ typedef struct Nom_score {char* nom ; int score ; struct Nom_score * cdr ;} * li
 
 list cons_score(char * nom , int score , list liste);
 int dial(char * host, char * port);          // dans dial.c
-char * answerone(char * port, int (*fun)(int)); // dans answer.c
+char *answersync(char * port, int (*fun)(int));

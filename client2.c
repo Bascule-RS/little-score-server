@@ -1,16 +1,24 @@
-/* client.c
-Se connecter a un serveur qui calcule 3n+1
-*/
+/* ******************************************************
+Nom ......... : client.c
+Role ........ : client d'échanges de scores
+Auteur ...... : Jean Méhat (mais largement revisité par
+                Nicolas Tercé)
+Version ..... : V1 .1 du 13/11/2020
+Licence ..... : réalisé dans le cadre du cours de SE (IED L2)
+Compilation :
+gcc -Wall client.c -Dtest -o client
+Pour exécuter , tapez : ./client
+******************************************************* */
 # include "sys.h"
 # define taille_saisie 15
-# define DEBUG if (1) fprintf
+# define DEBUG if (0) fprintf
 /* travail  --  dialogue avec le serveur */
 void
-travail(FILE * stream){
+travail(FILE * stream, char * order){
   char buffer[100];
   char requete[15];
 
-  /////établissement de la connexion:
+  ////établissement de la connexion:
   fprintf(stream, "SET\n");
   if (fgets(buffer, sizeof buffer, stream) == 0)
   {
@@ -18,9 +26,9 @@ travail(FILE * stream){
     return;
   }
 
-  /// test d'erreur sur le stream, si le code n'est pas 200:
+  ////test d'erreur sur le stream, si le code n'est pas 200:
   if (strncmp(buffer, "200 ", 4) != 0){
-    fprintf(stderr, "client: recu %s", buffer);
+    fprintf(stderr, "client erreur d'établissement de connexion: recu %s", buffer);
     return;
   }
 
@@ -30,53 +38,55 @@ travail(FILE * stream){
 
   }
 
-  for(;;)
+  ////ici j'ai enlevé la boucle, pour qu'il n'y ai qu'un echange:
+  ////envoi de la requête sur le stream:
+  fprintf(stream, order);
+
+  DEBUG(stdout,"envoyé:'%s'\n",order);
+  ////cas d'erreur de connexion
+  if (fgets(buffer, sizeof buffer, stream) == 0)
   {
-    fgets (requete,taille_saisie,stdin  );
-    char * strToken = strtok ( requete, " " );
-     while ( strToken != NULL ) {
-       if strToken
-     printf ( "%s\n", strToken );
-     // On demande le token suivant.
-     strToken = strtok ( NULL, separators );
- }
-    ///envoi de la requête sur le stream:
-    fprintf(stream, requete);
+    DEBUG(stdout,"buffer contient:%s\n",buffer);
 
-    ////cas d'erreur de connexion
-    if (fgets(buffer, sizeof buffer, stream) == 0){
-      fprintf(stderr, "client: connexion rompue\n");
-      return;
-    }
-    else if (strncmp(buffer, "200 reçu ASK", 12) == 0)
-    {
-      printf("200 Demande ASK reçue\n");
-      while(fgets(buffer, sizeof buffer, stream)!=NULL && strcmp(strdup(buffer),"200 transmission scores terminée\n")!=0)
-      printf("%s",buffer);
-      //// impression de la ligne de fin de transmission :
-      printf("%s",buffer);
-      DEBUG(stdout,"EOF\n");
-    }
-
-    else if (strncmp(buffer, "200 reçu ADD", 12) == 0)
-    {
-      printf("200 Demande ADD reçue.\n");
-    }
-    else if (strncmp(buffer, "200 ", 4) != 0)
-    {
-      fprintf(stderr, "client: erreur, recu %s", buffer);
-      return;
-    }
+    fprintf(stderr, "client: connexion rompue\n");
+    return;
   }
-  printf("1 \n");
+  ////reception des meilleurs scores:
+  else if (strncmp(buffer, "250 reçu ASK", 12) == 0)
+  {
+    printf("%s\n",buffer);
+    printf("--------------------------\nMEILLEURS SCORES:\n--------------------------\n");
+    while(fgets(buffer, sizeof buffer, stream)!=NULL && strcmp(strdup(buffer),"250 transmission scores terminée\n")!=0)
+    printf("%s",buffer);
+    printf("--------------------------\n");
+    //// impression de la ligne de fin de transmission :
+    printf("%s",buffer);
+
+    DEBUG(stdout,"EOF\n");
+    return;
+  }
+
+  else if (strncmp(buffer, "250 reçu ADD", 12) == 0)
+  {
+    printf("%s\n",buffer);
+    printf("Score du gagnant transféré !\n");
+    return;
+  }
+  else if (strncmp(buffer, "250 ", 4) != 0)
+  {
+    fprintf(stderr, "Client: erreur, recu %s", buffer);
+    return;
+  }
 }
 
+////J'ai conservé cette partie :
+# ifdef TEST
 int
 main(int ac, char * av[]){
   int i, t;
   FILE * stream;
-
-  t = dial("localhost", "19986");
+  char* order = "ASK\n"
+  t = dial("192.168.1.16", "19986");
   if (t < 0){
     fprintf(stderr, "Pas moyen d'appeler %s\n", "localhost");
     exit(1);
@@ -86,9 +96,10 @@ main(int ac, char * av[]){
     perror("fdopen");
     exit(1);
   }
-  setbuf(stream, 0);		/* pas de buffer */
-  travail(stream);
+  setbuf(stream, 0);
+  travail(stream,order);
 
   fprintf(stream, "QUIT\n");
   return 0;
 }
+# endif
