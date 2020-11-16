@@ -1,2 +1,0 @@
-gcc -Wall tic-tac-toe.c client2.c n-dial.c -o tic 
-gcc -Wall serveur2.c n-answersync.c -o ser
